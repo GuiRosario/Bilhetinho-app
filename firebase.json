@@ -2,6 +2,9 @@
   "react-native": {
     "android_bypass_emulator_url_remap": true
   },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "storage": {
     "rules": "storage.rules"
   },

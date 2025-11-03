@@ -1,6 +1,19 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { Canvas, Path, useCanvasRef } from '@shopify/react-native-skia';
+// Restore dynamic import from package index to avoid transform-time codegen errors
+let SkiaModule: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  SkiaModule = require('@shopify/react-native-skia');
+} catch (e) {
+  console.warn('[DrawingScreen] Skia module not available:', e);
+}
+const Canvas = SkiaModule?.Canvas ?? View;
+const SkiaPath = SkiaModule?.Path ?? (() => null);
+const useCanvasRef = SkiaModule?.useCanvasRef ?? (() => useRef(null));
+const Skia = SkiaModule?.Skia;
+// Consider Skia available if Canvas exists (module loaded without throwing)
+const skiaAvailable = !!SkiaModule?.Canvas;
 import { sendNotelet } from '../services/firebase';
 
 const COLORS = ['#000000', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B', '#8A2BE2'];
@@ -13,6 +26,24 @@ const DrawingScreen = ({ route, navigation }) => {
   const [color, setColor] = useState('#000000');
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Skia touch handler (preferred over RN onTouchStart/Move/End for Canvas)
+  const handleCanvasTouch = (touch) => {
+    const { x, y, type } = touch;
+    if (type === 'start') {
+      setCurrentPath({ points: [{ x, y }], color });
+    } else if (type === 'active') {
+      if (!currentPath) return;
+      setCurrentPath((prev) => {
+        if (!prev) return prev;
+        return { ...prev, points: [...prev.points, { x, y }] };
+      });
+    } else if (type === 'end') {
+      if (!currentPath) return;
+      setPaths((prev) => [...prev, currentPath]);
+      setCurrentPath(null);
+    }
+  };
   
   const handleTouchStart = (event) => {
     const { x, y } = event.nativeEvent;
@@ -50,7 +81,8 @@ const DrawingScreen = ({ route, navigation }) => {
     setLoading(true);
     try {
       // Convert canvas to image data URL
-      const imageData = canvasRef.current?.makeImageSnapshot().encodeToBase64();
+      const imageData = canvasRef.current?.makeImageSnapshot?.()
+        ?.encodeToBase64?.();
       
       if (!imageData && !text.trim()) {
         Alert.alert('Error', 'Failed to capture drawing. Please try again.');
@@ -94,10 +126,15 @@ const DrawingScreen = ({ route, navigation }) => {
       d += ` L ${path.points[i].x} ${path.points[i].y}`;
     }
     
+    // If Skia is available, convert SVG path string to SkPath; otherwise, keep string
+    const skPathVal = Skia?.Path?.MakeFromSVGString
+      ? Skia.Path.MakeFromSVGString(d)
+      : d;
+
     return (
-      <Path
+      <SkiaPath
         key={index}
-        path={d}
+        path={skPathVal}
         strokeWidth={5}
         style="stroke"
         color={path.color}
@@ -108,19 +145,27 @@ const DrawingScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.canvasContainer}>
-        <Canvas
-          style={styles.canvas}
-          ref={canvasRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {paths.map(renderPath)}
-          {currentPath && renderPath(currentPath, 'current')}
-        </Canvas>
+        {skiaAvailable ? (
+          <Canvas
+            style={styles.canvas}
+            ref={canvasRef}
+            onTouch={handleCanvasTouch}
+          >
+            {paths.map(renderPath)}
+            {currentPath && renderPath(currentPath, 'current')}
+          </Canvas>
+        ) : (
+          <View style={styles.canvas} />
+        )}
       </View>
+      {!skiaAvailable && (
+        <Text style={styles.infoText}>
+          Drawing is temporarily unavailable. Please ensure Skia is installed.
+        </Text>
+      )}
       
-      <View style={styles.colorPicker}>
+  <View style={styles.colorPicker}>
+        <Text style={styles.debugText}>Skia: {skiaAvailable ? 'ON' : 'OFF'}</Text>
         {COLORS.map((colorOption) => (
           <TouchableOpacity
             key={colorOption}
@@ -203,6 +248,11 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginVertical: 10,
+  },
+  infoText: {
+    color: '#cc0000',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   buttonRow: {
     flexDirection: 'row',

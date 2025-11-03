@@ -5,7 +5,10 @@ import messaging from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 // Authentication functions
 
-if (__DEV__) {
+// Use emuladores apenas quando explicitamente habilitados.
+const USE_EMULATORS = true;
+
+if (__DEV__ && USE_EMULATORS) {
   // In Android emulador, 10.0.2.2 aponta para o host (PC).
   // Em iOS/simulador e web, 127.0.0.1 funciona como esperado.
   const host = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
@@ -27,6 +30,7 @@ export const signInAnonymously = async () => {
 
 // Connection code functions
 export const generateConnectionCode = async (userId: string) => {
+  console.log('[generateConnectionCode] Iniciando geração para userId=', userId);
   // Generate a random 6-character alphanumeric code
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
@@ -38,11 +42,20 @@ export const generateConnectionCode = async (userId: string) => {
   const formattedCode = `${code.substring(0, 3)}-${code.substring(3, 6)}`;
 
   // Store the code in Firestore
-  await firestore().collection('users').doc(userId).set({
-    connectionCode: formattedCode,
-    role: 'recipient',
-    createdAt: firestore.FieldValue.serverTimestamp(),
-  });
+  try {
+    await firestore().collection('users').doc(userId).set(
+      {
+        connectionCode: formattedCode,
+        role: 'recipient',
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    console.log('[generateConnectionCode] Código salvo no Firestore:', formattedCode);
+  } catch (err) {
+    console.error('[generateConnectionCode] Falha ao salvar código:', err);
+    throw err;
+  }
 
   return formattedCode;
 };

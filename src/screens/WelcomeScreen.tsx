@@ -25,15 +25,33 @@ const WelcomeScreen = ({ navigation }) => {
     if (!userId) return;
     
     setLoading(true);
+    console.log('[Welcome] Recipient setup iniciado para userId=', userId);
+    // Watchdog para evitar loading infinito
+    const timeoutMs = 15000;
+    let timeoutId: any;
+    const startTimeout = () => {
+      timeoutId = setTimeout(() => {
+        console.warn('[Welcome] Timeout ao gerar código de conexão');
+        setLoading(false);
+        Alert.alert('Erro', 'Demorou para gerar o código. Verifique sua conexão e tente novamente.');
+      }, timeoutMs);
+    };
+
     try {
+      startTimeout();
       const code = await generateConnectionCode(userId);
+      clearTimeout(timeoutId);
+      console.log('[Welcome] Código de conexão gerado:', code);
       navigation.navigate('Connection', { 
         mode: 'recipient', 
         userId, 
         connectionCode: code 
       });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to generate connection code. Please try again.');
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      console.error('[Welcome] Falha ao gerar código:', error);
+      const message = error?.message || 'Failed to generate connection code. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
