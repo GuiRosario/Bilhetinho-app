@@ -1,0 +1,9 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Permitir acesso de leitura e gravação para todos durante o desenvolvimento
+      allow read, write;
+    }
+  }
+}

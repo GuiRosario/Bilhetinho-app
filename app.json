@@ -1,4 +1,10 @@
 {
-  "name": "Bilhetinho",
-  "displayName": "Bilhetinho"
+  "expo": {
+    "name": "Bilhetinho",
+    "slug": "bilhetinho",
+    "android": {
+      "package": "com.bilhetinho",
+      "usesCleartextTraffic": true
+    }
+  }
 }

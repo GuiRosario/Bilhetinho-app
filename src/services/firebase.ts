@@ -2,8 +2,19 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import messaging from '@react-native-firebase/messaging';
-
+import { Platform } from 'react-native';
 // Authentication functions
+
+if (__DEV__) {
+  // In Android emulador, 10.0.2.2 aponta para o host (PC).
+  // Em iOS/simulador e web, 127.0.0.1 funciona como esperado.
+  const host = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+
+  auth().useEmulator(`http://${host}:9099`);
+  firestore().useEmulator(host, 8080);
+  storage().useEmulator(host, 9199);
+}
+
 export const signInAnonymously = async () => {
   try {
     const userCredential = await auth().signInAnonymously();
@@ -22,17 +33,17 @@ export const generateConnectionCode = async (userId: string) => {
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
+
   // Format as XXX-XXX
   const formattedCode = `${code.substring(0, 3)}-${code.substring(3, 6)}`;
-  
+
   // Store the code in Firestore
   await firestore().collection('users').doc(userId).set({
     connectionCode: formattedCode,
     role: 'recipient',
     createdAt: firestore.FieldValue.serverTimestamp(),
   });
-  
+
   return formattedCode;
 };
 
@@ -42,44 +53,44 @@ export const connectWithCode = async (userId: string, code: string) => {
     .collection('users')
     .where('connectionCode', '==', code)
     .get();
-  
+
   if (querySnapshot.empty) {
     throw new Error('Invalid connection code');
   }
-  
+
   const recipientDoc = querySnapshot.docs[0];
   const recipientId = recipientDoc.id;
-  
+
   // Create a connection between the two users
   await firestore().collection('connections').add({
     senderId: userId,
     recipientId: recipientId,
     createdAt: firestore.FieldValue.serverTimestamp(),
   });
-  
+
   // Update the current user's role
   await firestore().collection('users').doc(userId).set({
     role: 'sender',
     connectedTo: recipientId,
     createdAt: firestore.FieldValue.serverTimestamp(),
   });
-  
+
   return recipientId;
 };
 
 // Notelet functions
 export const sendNotelet = async (
-  senderId: string, 
-  recipientId: string, 
-  imageData: string, 
-  text: string
+  senderId: string,
+  recipientId: string,
+  imageData: string,
+  text: string,
 ) => {
   try {
     // Upload the drawing to Firebase Storage
     const storageRef = storage().ref(`notelets/${senderId}_${Date.now()}.png`);
     await storageRef.putString(imageData, 'data_url');
     const imageUrl = await storageRef.getDownloadURL();
-    
+
     // Save the notelet data to Firestore
     const noteletRef = await firestore().collection('notelets').add({
       senderId,
@@ -89,7 +100,7 @@ export const sendNotelet = async (
       createdAt: firestore.FieldValue.serverTimestamp(),
       read: false,
     });
-    
+
     return noteletRef.id;
   } catch (error) {
     console.error('Error sending notelet:', error);
@@ -105,11 +116,11 @@ export const getLatestNotelet = async (userId: string) => {
       .orderBy('createdAt', 'desc')
       .limit(1)
       .get();
-    
+
     if (querySnapshot.empty) {
       return null;
     }
-    
+
     const noteletData = querySnapshot.docs[0].data();
     return {
       id: querySnapshot.docs[0].id,
@@ -130,7 +141,7 @@ export const getNoteletHistory = async (userId: string, limit = 10) => {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
@@ -145,8 +156,10 @@ export const getNoteletHistory = async (userId: string, limit = 10) => {
 // Push notification functions
 export const requestNotificationPermission = async () => {
   const authStatus = await messaging().requestPermission();
-  return authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  return (
+    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+    authStatus === messaging.AuthorizationStatus.PROVISIONAL
+  );
 };
 
 export const registerDeviceToken = async (userId: string) => {

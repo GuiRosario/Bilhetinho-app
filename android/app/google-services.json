@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "983367411395",
+    "project_id": "bilhetinho-acf03",
+    "storage_bucket": "bilhetinho-acf03.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983367411395:android:81fa062947588eb569e476",
+        "android_client_info": {
+          "package_name": "com.bilhetinho"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtnBqZoKCrCt5J6JClmpRYYy7kI7El1h8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
